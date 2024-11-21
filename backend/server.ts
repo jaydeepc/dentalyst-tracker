@@ -9,35 +9,21 @@ config();
 const app = express();
 
 // Get allowed origins from environment variable or use default
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : [
-      'http://localhost:3000', 
-      'https://dentalyst-tracker.vercel.app',
-      'https://dentalyst-expense.vercel.app'
-    ];
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://dentalyst-tracker.vercel.app',
+  'https://dentalyst-expense.vercel.app',
+  'https://dentalyst-expense.vercel.app/'
+];
 
 // Configure CORS with specific origins
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-  preflightContinue: false,
   optionsSuccessStatus: 204
 }));
-
-// Handle preflight requests
-app.options('*', cors());
 
 app.use(express.json());
 
