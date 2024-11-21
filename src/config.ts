@@ -1,5 +1,5 @@
 // You can change this to your deployed backend URL when deploying to production
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001';
 
 export const API_BASE_URL = BACKEND_URL;
 
@@ -11,7 +11,8 @@ export const checkBackendHealth = async () => {
     return {
       isHealthy: data.status === 'healthy',
       isDatabaseConnected: data.database === 'connected',
-      timestamp: data.timestamp
+      timestamp: data.timestamp,
+      version: data.version
     };
   } catch (error) {
     return {
