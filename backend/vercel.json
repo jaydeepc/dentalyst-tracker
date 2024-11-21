@@ -8,30 +8,13 @@
   ],
   "routes": [
     {
-      "src": "/health",
-      "dest": "server.ts",
-      "headers": {
-        "Access-Control-Allow-Origin": "https://dentalyst-expense.vercel.app",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization"
-      }
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "server.ts",
-      "headers": {
-        "Access-Control-Allow-Origin": "https://dentalyst-expense.vercel.app",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization"
-      }
-    },
-    {
       "src": "/(.*)",
       "dest": "server.ts",
       "headers": {
         "Access-Control-Allow-Origin": "https://dentalyst-expense.vercel.app",
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Credentials": "true"
       }
     }
   ]
