@@ -10,9 +10,14 @@ import {
   Stack,
   useTheme,
   Fade,
-  InputAdornment,
-  IconButton,
-  Tooltip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  useMediaQuery,
 } from '@mui/material';
 import {
   BarChart,
@@ -25,15 +30,10 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip as RechartsTooltip,
+  Tooltip,
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import {
-  CalendarToday as CalendarIcon,
-  Category as CategoryIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
 import { API_BASE_URL } from '../config';
 
 interface ExpenseData {
@@ -43,6 +43,12 @@ interface ExpenseData {
     category: string;
   };
   total: number;
+}
+
+interface SummaryData {
+  category: string;
+  total: number;
+  percentage: number;
 }
 
 const COLORS = [
@@ -75,11 +81,13 @@ const categories = [
 
 const Reports = () => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [expenses, setExpenses] = useState<ExpenseData[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0].substring(0, 7)
   );
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [summaryData, setSummaryData] = useState<SummaryData[]>([]);
 
   useEffect(() => {
     fetchExpenses();
@@ -90,9 +98,29 @@ const Reports = () => {
       const response = await fetch(`${API_BASE_URL}/api/expenses/monthly`);
       const data = await response.json();
       setExpenses(data);
+      calculateSummary(data);
     } catch (error) {
       console.error('Error fetching expenses:', error);
     }
+  };
+
+  const calculateSummary = (data: ExpenseData[]) => {
+    const totals = categories.reduce((acc: { [key: string]: number }, category) => {
+      acc[category] = data
+        .filter(expense => expense._id.category === category)
+        .reduce((sum, expense) => sum + expense.total, 0);
+      return acc;
+    }, {});
+
+    const totalExpense = Object.values(totals).reduce((sum, value) => sum + value, 0);
+
+    const summary = categories.map(category => ({
+      category,
+      total: totals[category],
+      percentage: totalExpense ? (totals[category] / totalExpense) * 100 : 0
+    }));
+
+    setSummaryData(summary);
   };
 
   const processDataForCharts = () => {
@@ -122,15 +150,6 @@ const Reports = () => {
     });
   };
 
-  const calculateCategoryTotals = () => {
-    return categories.map((category) => ({
-      category,
-      total: expenses
-        .filter((expense) => expense._id.category === category)
-        .reduce((sum, expense) => sum + expense.total, 0),
-    }));
-  };
-
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -156,7 +175,6 @@ const Reports = () => {
   };
 
   const monthlyData = processDataForCharts();
-  const categoryTotals = calculateCategoryTotals();
 
   return (
     <Fade in timeout={800}>
@@ -184,13 +202,6 @@ const Reports = () => {
                     InputLabelProps={{
                       shrink: true,
                     }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <CalendarIcon color="action" />
-                        </InputAdornment>
-                      ),
-                    }}
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>
@@ -200,13 +211,6 @@ const Reports = () => {
                     label="Category"
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <CategoryIcon color="action" />
-                        </InputAdornment>
-                      ),
-                    }}
                   >
                     <MenuItem value="all">All Categories</MenuItem>
                     {categories.map((category) => (
@@ -216,16 +220,42 @@ const Reports = () => {
                     ))}
                   </TextField>
                 </Grid>
-                <Grid item xs={12} md={4}>
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Tooltip title="Select month and category to filter the data">
-                      <IconButton color="primary">
-                        <InfoIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                </Grid>
               </Grid>
+            </CardContent>
+          </Card>
+
+          {/* Summary Table */}
+          <Card>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom color="primary.dark" fontWeight={600}>
+                Expense Summary
+              </Typography>
+              <TableContainer component={Paper} elevation={0}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Category</TableCell>
+                      <TableCell align="right">Total Amount</TableCell>
+                      <TableCell align="right">Percentage</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {summaryData.map((row) => (
+                      <TableRow key={row.category}>
+                        <TableCell component="th" scope="row">
+                          {row.category}
+                        </TableCell>
+                        <TableCell align="right">
+                          ₹{row.total.toLocaleString()}
+                        </TableCell>
+                        <TableCell align="right">
+                          {row.percentage.toFixed(1)}%
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             </CardContent>
           </Card>
 
@@ -233,28 +263,29 @@ const Reports = () => {
             <Grid item xs={12}>
               <Card>
                 <CardContent sx={{ p: 3 }}>
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="h6" color="primary.dark" fontWeight={600}>
-                      Monthly Expense Trends
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Track your expenses over time
-                    </Typography>
-                  </Box>
-                  <Box sx={{ height: 400 }}>
-                    <ResponsiveContainer>
-                      <LineChart data={monthlyData}>
+                  <Typography variant="h6" gutterBottom color="primary.dark" fontWeight={600}>
+                    Monthly Expense Trends
+                  </Typography>
+                  <Box sx={{ height: isMobile ? 300 : 400, mt: 2 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={monthlyData}
+                        margin={isMobile ? { top: 5, right: 10, left: -20, bottom: 5 } : { top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
                         <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                         <XAxis
                           dataKey="monthYear"
                           stroke={theme.palette.text.secondary}
                           tick={{ fill: theme.palette.text.secondary }}
+                          angle={isMobile ? -45 : 0}
+                          textAnchor={isMobile ? 'end' : 'middle'}
+                          height={isMobile ? 60 : 30}
                         />
                         <YAxis
                           stroke={theme.palette.text.secondary}
                           tick={{ fill: theme.palette.text.secondary }}
                         />
-                        <RechartsTooltip content={<CustomTooltip />} />
+                        <Tooltip content={<CustomTooltip />} />
                         <Legend />
                         <Line
                           type="monotone"
@@ -274,36 +305,31 @@ const Reports = () => {
             <Grid item xs={12} md={6}>
               <Card>
                 <CardContent sx={{ p: 3 }}>
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="h6" color="primary.dark" fontWeight={600}>
-                      Category Distribution
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Expense breakdown by category
-                    </Typography>
-                  </Box>
-                  <Box sx={{ height: 400 }}>
-                    <ResponsiveContainer>
-                      <PieChart>
+                  <Typography variant="h6" gutterBottom color="primary.dark" fontWeight={600}>
+                    Category Distribution
+                  </Typography>
+                  <Box sx={{ height: isMobile ? 300 : 400, mt: 2 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart margin={isMobile ? { top: 0, right: 0, left: 0, bottom: 0 } : { top: 0, right: 30, left: 30, bottom: 0 }}>
                         <Pie
-                          data={categoryTotals}
+                          data={summaryData}
                           dataKey="total"
                           nameKey="category"
                           cx="50%"
                           cy="50%"
-                          outerRadius={150}
+                          outerRadius={isMobile ? '70%' : '80%'}
                           label={({ name, percent }) =>
-                            `${name} (${(percent * 100).toFixed(0)}%)`
+                            isMobile ? `${(percent * 100).toFixed(0)}%` : `${name} (${(percent * 100).toFixed(0)}%)`
                           }
                         >
-                          {categoryTotals.map((entry, index) => (
+                          {summaryData.map((entry, index) => (
                             <Cell
                               key={entry.category}
                               fill={COLORS[index % COLORS.length]}
                             />
                           ))}
                         </Pie>
-                        <RechartsTooltip
+                        <Tooltip
                           formatter={(value: number) =>
                             `₹${value.toLocaleString()}`
                           }
@@ -318,17 +344,15 @@ const Reports = () => {
             <Grid item xs={12} md={6}>
               <Card>
                 <CardContent sx={{ p: 3 }}>
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="h6" color="primary.dark" fontWeight={600}>
-                      Category Comparison
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Compare expenses across categories
-                    </Typography>
-                  </Box>
-                  <Box sx={{ height: 400 }}>
-                    <ResponsiveContainer>
-                      <BarChart data={categoryTotals}>
+                  <Typography variant="h6" gutterBottom color="primary.dark" fontWeight={600}>
+                    Category Comparison
+                  </Typography>
+                  <Box sx={{ height: isMobile ? 300 : 400, mt: 2 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={summaryData}
+                        margin={isMobile ? { top: 5, right: 10, left: -20, bottom: 60 } : { top: 5, right: 30, left: 20, bottom: 60 }}
+                      >
                         <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                         <XAxis
                           dataKey="category"
@@ -337,14 +361,16 @@ const Reports = () => {
                           angle={-45}
                           textAnchor="end"
                           height={100}
+                          interval={0}
+                          fontSize={isMobile ? 10 : 12}
                         />
                         <YAxis
                           stroke={theme.palette.text.secondary}
                           tick={{ fill: theme.palette.text.secondary }}
                         />
-                        <RechartsTooltip content={<CustomTooltip />} />
+                        <Tooltip content={<CustomTooltip />} />
                         <Bar dataKey="total" radius={[8, 8, 0, 0]}>
-                          {categoryTotals.map((entry, index) => (
+                          {summaryData.map((entry, index) => (
                             <Cell
                               key={entry.category}
                               fill={COLORS[index % COLORS.length]}
