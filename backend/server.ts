@@ -56,6 +56,22 @@ app.post('/api/expenses', async (req, res) => {
   }
 });
 
+// Bulk expense creation
+app.post('/api/expenses/bulk', async (req, res) => {
+  try {
+    const { expenses } = req.body;
+    if (!Array.isArray(expenses)) {
+      return res.status(400).json({ error: 'Expenses must be an array' });
+    }
+
+    const createdExpenses = await Expense.insertMany(expenses);
+    res.status(201).json(createdExpenses);
+  } catch (error) {
+    console.error('Error creating bulk expenses:', error);
+    res.status(400).json({ error: 'Failed to create bulk expenses' });
+  }
+});
+
 app.get('/api/expenses', async (_req, res) => {
   try {
     const expenses = await Expense.find().sort({ date: -1 });
