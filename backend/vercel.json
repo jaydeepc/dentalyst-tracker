@@ -12,11 +12,8 @@
       "dest": "server.ts"
     },
     {
-      "src": "//health",
-      "status": 308,
-      "headers": {
-        "Location": "/health"
-      }
+      "src": "/api/(.*)",
+      "dest": "server.ts"
     },
     {
       "src": "/(.*)",
