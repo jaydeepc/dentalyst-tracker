@@ -18,6 +18,7 @@ import {
   TableRow,
   Paper,
   useMediaQuery,
+  CircularProgress,
 } from '@mui/material';
 import {
   BarChart,
@@ -51,6 +52,13 @@ interface SummaryData {
   percentage: number;
 }
 
+interface ProfitData {
+  grossIncome: number;
+  totalExpenses: number;
+  profit: number;
+  profitPercentage: number;
+}
+
 const COLORS = [
   '#0062FF', // Primary
   '#00C6FF', // Secondary
@@ -62,7 +70,6 @@ const COLORS = [
   '#85E6FF',
   '#003285',
   '#006B99',
-  '#A8C4FF',
 ];
 
 const categories = [
@@ -76,7 +83,6 @@ const categories = [
   'Repairs',
   'Rent',
   'E-Bill',
-  'Profit',
 ];
 
 const Reports = () => {
@@ -88,6 +94,12 @@ const Reports = () => {
   );
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [summaryData, setSummaryData] = useState<SummaryData[]>([]);
+  const [profitData, setProfitData] = useState<ProfitData>({
+    grossIncome: 0,
+    totalExpenses: 0,
+    profit: 0,
+    profitPercentage: 0,
+  });
 
   useEffect(() => {
     fetchExpenses();
@@ -112,13 +124,28 @@ const Reports = () => {
       return acc;
     }, {});
 
-    const totalExpense = Object.values(totals).reduce((sum, value) => sum + value, 0);
+    const grossIncome = totals['Gross Income'] || 0;
+    const totalExpenses = Object.entries(totals)
+      .filter(([category]) => category !== 'Gross Income')
+      .reduce((sum, [_, value]) => sum + value, 0);
+    
+    const profit = grossIncome - totalExpenses;
+    const profitPercentage = grossIncome ? (profit / grossIncome) * 100 : 0;
 
-    const summary = categories.map(category => ({
-      category,
-      total: totals[category],
-      percentage: totalExpense ? (totals[category] / totalExpense) * 100 : 0
-    }));
+    setProfitData({
+      grossIncome,
+      totalExpenses,
+      profit,
+      profitPercentage,
+    });
+
+    const summary = categories
+      .filter(category => category !== 'Gross Income')
+      .map(category => ({
+        category,
+        total: totals[category],
+        percentage: totalExpenses ? (totals[category] / totalExpenses) * 100 : 0
+      }));
 
     setSummaryData(summary);
   };
@@ -178,7 +205,7 @@ const Reports = () => {
 
   return (
     <Fade in timeout={800}>
-      <Box>
+      <Box sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack spacing={3}>
           <Box>
             <Typography variant="h4" gutterBottom color="primary.dark" fontWeight={700}>
@@ -188,6 +215,89 @@ const Reports = () => {
               Analyze your dental clinic expenses with detailed visualizations
             </Typography>
           </Box>
+
+          {/* Profit Overview Cards */}
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(45deg, #2196f3 30%, #64b5f6 90%)',
+                color: 'white',
+                height: '100%'
+              }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>Gross Income</Typography>
+                  <Typography variant="h4">₹{profitData.grossIncome.toLocaleString()}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(45deg, #ff9800 30%, #ffb74d 90%)',
+                color: 'white',
+                height: '100%'
+              }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>Total Expenses</Typography>
+                  <Typography variant="h4">₹{profitData.totalExpenses.toLocaleString()}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(45deg, #4caf50 30%, #81c784 90%)',
+                color: 'white',
+                height: '100%'
+              }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>Net Profit</Typography>
+                  <Typography variant="h4">₹{profitData.profit.toLocaleString()}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(45deg, #9c27b0 30%, #ba68c8 90%)',
+                color: 'white',
+                height: '100%',
+                position: 'relative'
+              }}>
+                <CardContent sx={{ 
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%'
+                }}>
+                  <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                    <CircularProgress
+                      variant="determinate"
+                      value={Math.max(0, Math.min(profitData.profitPercentage, 100))}
+                      size={80}
+                      thickness={4}
+                      sx={{ color: 'rgba(255, 255, 255, 0.9)' }}
+                    />
+                    <Box
+                      sx={{
+                        top: 0,
+                        left: 0,
+                        bottom: 0,
+                        right: 0,
+                        position: 'absolute',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Typography variant="h6" component="div" color="white">
+                        {Math.round(profitData.profitPercentage)}%
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Typography variant="subtitle1" sx={{ mt: 1 }}>Profit Margin</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
 
           <Card>
             <CardContent sx={{ p: 3 }}>
