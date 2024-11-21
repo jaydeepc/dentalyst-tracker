@@ -8,11 +8,30 @@ config();
 
 const app = express();
 
-// Configure CORS before any routes
+// Get allowed origins from environment variable or use default
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : [
+      'http://localhost:3000', 
+      'https://dentalyst-tracker.vercel.app',
+      'https://dentalyst-expense.vercel.app'
+    ];
+
+// Configure CORS with specific origins
 app.use(cors({
-  origin: '*', // In production, you should specify your frontend URL
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 
 app.use(express.json());
@@ -29,7 +48,8 @@ app.get('/health', (_req, res) => {
     status: 'healthy',
     timestamp: new Date().toISOString(),
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    version: '1.0.0'
+    version: '1.0.0',
+    allowedOrigins
   });
 });
 
@@ -78,8 +98,18 @@ app.get('/api/expenses/monthly', async (_req, res) => {
   }
 });
 
+// Error handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(err.stack);
+  res.status(500).json({
+    error: 'Something broke!',
+    message: err.message
+  });
+});
+
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Health check available at http://localhost:${PORT}/health`);
+  console.log('Allowed origins:', allowedOrigins);
 });

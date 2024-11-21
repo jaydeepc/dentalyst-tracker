@@ -8,6 +8,17 @@
   ],
   "routes": [
     {
+      "src": "/health",
+      "dest": "server.ts"
+    },
+    {
+      "src": "//health",
+      "status": 308,
+      "headers": {
+        "Location": "/health"
+      }
+    },
+    {
       "src": "/(.*)",
       "dest": "server.ts"
     }
