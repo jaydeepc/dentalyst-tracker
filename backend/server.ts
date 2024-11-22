@@ -18,7 +18,13 @@ const allowedOrigins = [
 
 // Configure CORS with specific origins
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -27,20 +33,25 @@ app.use(cors({
 
 app.use(express.json());
 
-// MongoDB connection with enhanced retry logic
-const connectDB = async (retryCount = 0) => {
-  const MONGODB_URI = process.env.MONGODB_URI;
-  const MAX_RETRIES = 5;
-  
-  if (!MONGODB_URI) {
-    console.error('MONGODB_URI environment variable is not set');
-    return;
-  }
-
+// MongoDB connection handler
+let isConnecting = false;
+const connectDB = async () => {
   try {
-    if (mongoose.connection.readyState === 1) {
-      console.log('MongoDB is already connected');
+    if (isConnecting) {
+      console.log('Connection already in progress');
       return;
+    }
+
+    if (mongoose.connection.readyState === 1) {
+      console.log('Already connected to MongoDB');
+      return;
+    }
+
+    isConnecting = true;
+    const MONGODB_URI = process.env.MONGODB_URI;
+    
+    if (!MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is not set');
     }
 
     const options: mongoose.ConnectOptions = {
@@ -53,40 +64,38 @@ const connectDB = async (retryCount = 0) => {
 
     await mongoose.connect(MONGODB_URI, options);
     console.log('Connected to MongoDB successfully');
-    
-    if (retryCount > 0) {
-      console.log(`Successfully reconnected after ${retryCount} retries`);
-    }
-  } catch (err) {
-    console.error(`MongoDB connection error (attempt ${retryCount + 1}/${MAX_RETRIES}):`, err);
-    
-    if (retryCount < MAX_RETRIES) {
-      const waitTime = Math.min(1000 * Math.pow(2, retryCount), 10000);
-      console.log(`Retrying connection in ${waitTime}ms...`);
-      setTimeout(() => connectDB(retryCount + 1), waitTime);
-    } else {
-      console.error('Max retry attempts reached. Could not connect to MongoDB');
-    }
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    throw error;
+  } finally {
+    isConnecting = false;
   }
 };
 
-// Initial database connection
-connectDB();
-
-// Monitor database connection
-mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB disconnected. Attempting to reconnect...');
-  connectDB();
-});
-
-mongoose.connection.on('error', (err) => {
-  console.error('MongoDB connection error:', err);
-  connectDB();
-});
+// Middleware to ensure database connection
+const ensureDbConnected = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      await connectDB();
+    }
+    next();
+  } catch (error) {
+    console.error('Database connection error in middleware:', error);
+    res.status(503).json({
+      error: 'Database connection unavailable',
+      details: 'The server is currently unable to handle the request due to database connection issues'
+    });
+  }
+};
 
 // Health check route with enhanced database status
-app.get('/health', (_req: Request, res: Response) => {
+app.get('/health', async (_req: Request, res: Response) => {
   try {
+    // Try to connect if not connected
+    if (mongoose.connection.readyState !== 1) {
+      await connectDB();
+    }
+
     const dbState = mongoose.connection.readyState;
     const dbStates: { [key: number]: string } = {
       0: 'disconnected',
@@ -110,22 +119,18 @@ app.get('/health', (_req: Request, res: Response) => {
     console.error('Health check error:', error);
     res.status(500).json({
       status: 'error',
-      error: 'Failed to check system health'
+      error: 'Failed to check system health',
+      details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
 
+// Apply database connection middleware to all expense routes
+app.use('/api/expenses', ensureDbConnected);
+
 // Expense routes with enhanced error handling
 app.post('/api/expenses', async (req: Request, res: Response) => {
   try {
-    // Check database connection first
-    if (mongoose.connection.readyState !== 1) {
-      return res.status(503).json({ 
-        error: 'Database connection unavailable',
-        details: 'The server is currently unable to handle the request due to database connection issues'
-      });
-    }
-
     // Validate required fields
     const { date, category, amount } = req.body;
     if (!date || !category || amount === undefined) {
@@ -154,6 +159,7 @@ app.post('/api/expenses', async (req: Request, res: Response) => {
     // Create and save the expense
     const expense = new Expense(req.body);
     const savedExpense = await expense.save();
+    console.log('Expense created successfully:', savedExpense);
     res.status(201).json(savedExpense);
   } catch (error: any) {
     console.error('Error creating expense:', {
@@ -179,13 +185,6 @@ app.post('/api/expenses', async (req: Request, res: Response) => {
 // Bulk expense creation
 app.post('/api/expenses/bulk', async (req: Request, res: Response) => {
   try {
-    if (mongoose.connection.readyState !== 1) {
-      return res.status(503).json({ 
-        error: 'Database connection unavailable',
-        details: 'The server is currently unable to handle the request due to database connection issues'
-      });
-    }
-
     const { expenses } = req.body;
     if (!Array.isArray(expenses)) {
       return res.status(400).json({ 
@@ -195,6 +194,7 @@ app.post('/api/expenses/bulk', async (req: Request, res: Response) => {
     }
 
     const createdExpenses = await Expense.insertMany(expenses);
+    console.log(`Successfully created ${createdExpenses.length} expenses`);
     res.status(201).json(createdExpenses);
   } catch (error: any) {
     console.error('Error creating bulk expenses:', error);
@@ -215,13 +215,6 @@ app.post('/api/expenses/bulk', async (req: Request, res: Response) => {
 
 app.get('/api/expenses', async (_req: Request, res: Response) => {
   try {
-    if (mongoose.connection.readyState !== 1) {
-      return res.status(503).json({ 
-        error: 'Database connection unavailable',
-        details: 'The server is currently unable to handle the request due to database connection issues'
-      });
-    }
-
     const expenses = await Expense.find().sort({ date: -1 });
     res.json(expenses);
   } catch (error) {
@@ -236,13 +229,6 @@ app.get('/api/expenses', async (_req: Request, res: Response) => {
 // Monthly aggregation for reports
 app.get('/api/expenses/monthly', async (_req: Request, res: Response) => {
   try {
-    if (mongoose.connection.readyState !== 1) {
-      return res.status(503).json({ 
-        error: 'Database connection unavailable',
-        details: 'The server is currently unable to handle the request due to database connection issues'
-      });
-    }
-
     const monthlyExpenses = await Expense.aggregate([
       {
         $group: {
