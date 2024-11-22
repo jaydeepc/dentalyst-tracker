@@ -59,6 +59,12 @@ interface ProfitData {
   profitPercentage: number;
 }
 
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+}
+
 const COLORS = [
   '#0062FF', // Primary
   '#00C6FF', // Secondary
@@ -177,7 +183,7 @@ const Reports = () => {
     });
   };
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <Card
@@ -201,60 +207,102 @@ const Reports = () => {
     return null;
   };
 
+  const renderCustomizedPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 1.7;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    
+    if (percent < 0.03) return null;
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill={theme.palette.text.primary}
+        textAnchor={x > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        fontSize={isMobile ? "10px" : "12px"}
+      >
+        {`${name} (${(percent * 100).toFixed(0)}%)`}
+      </text>
+    );
+  };
+
   const monthlyData = processDataForCharts();
 
   return (
     <Fade in timeout={800}>
-      <Box sx={{ p: { xs: 2, sm: 3 } }}>
-        <Stack spacing={3}>
+      <Box sx={{ p: { xs: 1, sm: 3 } }}>
+        <Stack spacing={{ xs: 2, sm: 3 }}>
           <Box>
-            <Typography variant="h4" gutterBottom color="primary.dark" fontWeight={700}>
+            <Typography 
+              variant={isMobile ? "h5" : "h4"} 
+              gutterBottom 
+              color="primary.dark" 
+              fontWeight={700}
+            >
               Expense Reports
             </Typography>
-            <Typography variant="subtitle1" color="text.secondary">
+            <Typography 
+              variant={isMobile ? "body1" : "subtitle1"} 
+              color="text.secondary"
+            >
               Analyze your dental clinic expenses with detailed visualizations
             </Typography>
           </Box>
 
           {/* Profit Overview Cards */}
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6} md={3}>
+          <Grid container spacing={{ xs: 1.5, sm: 3 }}>
+            <Grid item xs={6} sm={6} md={3}>
               <Card sx={{ 
                 background: 'linear-gradient(45deg, #2196f3 30%, #64b5f6 90%)',
                 color: 'white',
                 height: '100%'
               }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>Gross Income</Typography>
-                  <Typography variant="h4">₹{profitData.grossIncome.toLocaleString()}</Typography>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                  <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
+                    Gross Income
+                  </Typography>
+                  <Typography variant={isMobile ? "h6" : "h4"}>
+                    ₹{profitData.grossIncome.toLocaleString()}
+                  </Typography>
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <Card sx={{ 
                 background: 'linear-gradient(45deg, #ff9800 30%, #ffb74d 90%)',
                 color: 'white',
                 height: '100%'
               }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>Total Expenses</Typography>
-                  <Typography variant="h4">₹{profitData.totalExpenses.toLocaleString()}</Typography>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                  <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
+                    Total Expenses
+                  </Typography>
+                  <Typography variant={isMobile ? "h6" : "h4"}>
+                    ₹{profitData.totalExpenses.toLocaleString()}
+                  </Typography>
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <Card sx={{ 
                 background: 'linear-gradient(45deg, #4caf50 30%, #81c784 90%)',
                 color: 'white',
                 height: '100%'
               }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>Net Profit</Typography>
-                  <Typography variant="h4">₹{profitData.profit.toLocaleString()}</Typography>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                  <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
+                    Net Profit
+                  </Typography>
+                  <Typography variant={isMobile ? "h6" : "h4"}>
+                    ₹{profitData.profit.toLocaleString()}
+                  </Typography>
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <Card sx={{ 
                 background: 'linear-gradient(45deg, #9c27b0 30%, #ba68c8 90%)',
                 color: 'white',
@@ -266,13 +314,14 @@ const Reports = () => {
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  height: '100%'
+                  height: '100%',
+                  p: { xs: 1.5, sm: 2 }
                 }}>
                   <Box sx={{ position: 'relative', display: 'inline-flex' }}>
                     <CircularProgress
                       variant="determinate"
                       value={Math.max(0, Math.min(profitData.profitPercentage, 100))}
-                      size={80}
+                      size={isMobile ? 40 : 80}
                       thickness={4}
                       sx={{ color: 'rgba(255, 255, 255, 0.9)' }}
                     />
@@ -288,20 +337,22 @@ const Reports = () => {
                         justifyContent: 'center',
                       }}
                     >
-                      <Typography variant="h6" component="div" color="white">
+                      <Typography variant={isMobile ? "caption" : "h6"} component="div" color="white">
                         {Math.round(profitData.profitPercentage)}%
                       </Typography>
                     </Box>
                   </Box>
-                  <Typography variant="subtitle1" sx={{ mt: 1 }}>Profit Margin</Typography>
+                  <Typography variant={isMobile ? "body2" : "subtitle1"} sx={{ mt: 1 }}>
+                    Profit Margin
+                  </Typography>
                 </CardContent>
               </Card>
             </Grid>
           </Grid>
 
           <Card>
-            <CardContent sx={{ p: 3 }}>
-              <Grid container spacing={3} alignItems="center">
+            <CardContent sx={{ p: { xs: 1.5, sm: 3 } }}>
+              <Grid container spacing={{ xs: 1.5, sm: 3 }} alignItems="center">
                 <Grid item xs={12} md={4}>
                   <TextField
                     fullWidth
@@ -312,6 +363,7 @@ const Reports = () => {
                     InputLabelProps={{
                       shrink: true,
                     }}
+                    size={isMobile ? "small" : "medium"}
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>
@@ -321,6 +373,7 @@ const Reports = () => {
                     label="Category"
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
+                    size={isMobile ? "small" : "medium"}
                   >
                     <MenuItem value="all">All Categories</MenuItem>
                     {categories.map((category) => (
@@ -336,12 +389,17 @@ const Reports = () => {
 
           {/* Summary Table */}
           <Card>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom color="primary.dark" fontWeight={600}>
+            <CardContent sx={{ p: { xs: 1.5, sm: 3 } }}>
+              <Typography 
+                variant={isMobile ? "subtitle1" : "h6"} 
+                gutterBottom 
+                color="primary.dark" 
+                fontWeight={600}
+              >
                 Expense Summary
               </Typography>
               <TableContainer component={Paper} elevation={0}>
-                <Table>
+                <Table size={isMobile ? "small" : "medium"}>
                   <TableHead>
                     <TableRow>
                       <TableCell>Category</TableCell>
@@ -369,41 +427,56 @@ const Reports = () => {
             </CardContent>
           </Card>
 
-          <Grid container spacing={3}>
+          <Grid container spacing={{ xs: 1.5, sm: 3 }}>
             <Grid item xs={12}>
               <Card>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom color="primary.dark" fontWeight={600}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 3 } }}>
+                  <Typography 
+                    variant={isMobile ? "subtitle1" : "h6"} 
+                    gutterBottom 
+                    color="primary.dark" 
+                    fontWeight={600}
+                  >
                     Monthly Expense Trends
                   </Typography>
-                  <Box sx={{ height: isMobile ? 300 : 400, mt: 2 }}>
+                  <Box sx={{ height: isMobile ? 250 : 400, mt: 2 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={monthlyData}
-                        margin={isMobile ? { top: 5, right: 10, left: -20, bottom: 5 } : { top: 5, right: 30, left: 20, bottom: 5 }}
+                        margin={isMobile ? 
+                          { top: 5, right: 10, left: -15, bottom: 0 } : 
+                          { top: 5, right: 30, left: 20, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                         <XAxis
                           dataKey="monthYear"
                           stroke={theme.palette.text.secondary}
-                          tick={{ fill: theme.palette.text.secondary }}
+                          tick={{ 
+                            fill: theme.palette.text.secondary,
+                            fontSize: isMobile ? 10 : 12 
+                          }}
                           angle={isMobile ? -45 : 0}
                           textAnchor={isMobile ? 'end' : 'middle'}
-                          height={isMobile ? 60 : 30}
+                          height={isMobile ? 50 : 30}
                         />
                         <YAxis
                           stroke={theme.palette.text.secondary}
-                          tick={{ fill: theme.palette.text.secondary }}
+                          tick={{ 
+                            fill: theme.palette.text.secondary,
+                            fontSize: isMobile ? 10 : 12 
+                          }}
+                          tickFormatter={(value) => `₹${value.toLocaleString()}`}
+                          width={isMobile ? 60 : 80}
                         />
                         <Tooltip content={<CustomTooltip />} />
-                        <Legend />
+                        <Legend wrapperStyle={{ fontSize: isMobile ? 10 : 12 }} />
                         <Line
                           type="monotone"
                           dataKey="total"
                           stroke={theme.palette.primary.main}
-                          strokeWidth={3}
-                          dot={{ fill: theme.palette.primary.main, strokeWidth: 2 }}
-                          activeDot={{ r: 8 }}
+                          strokeWidth={2}
+                          dot={{ fill: theme.palette.primary.main, strokeWidth: 2, r: isMobile ? 3 : 4 }}
+                          activeDot={{ r: isMobile ? 6 : 8 }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -412,25 +485,32 @@ const Reports = () => {
               </Card>
             </Grid>
 
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <Card>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom color="primary.dark" fontWeight={600}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 3 } }}>
+                  <Typography 
+                    variant={isMobile ? "subtitle1" : "h6"} 
+                    gutterBottom 
+                    color="primary.dark" 
+                    fontWeight={600}
+                  >
                     Category Distribution
                   </Typography>
-                  <Box sx={{ height: isMobile ? 300 : 400, mt: 2 }}>
+                  <Box sx={{ height: isMobile ? 300 : 500, mt: 2 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart margin={isMobile ? { top: 0, right: 0, left: 0, bottom: 0 } : { top: 0, right: 30, left: 30, bottom: 0 }}>
+                      <PieChart margin={{ top: 20, right: isMobile ? 20 : 100, bottom: 20, left: isMobile ? 20 : 100 }}>
                         <Pie
                           data={summaryData}
                           dataKey="total"
                           nameKey="category"
                           cx="50%"
                           cy="50%"
-                          outerRadius={isMobile ? '70%' : '80%'}
-                          label={({ name, percent }) =>
-                            isMobile ? `${(percent * 100).toFixed(0)}%` : `${name} (${(percent * 100).toFixed(0)}%)`
-                          }
+                          outerRadius={isMobile ? '45%' : '65%'}
+                          label={renderCustomizedPieLabel}
+                          labelLine={{
+                            stroke: theme.palette.text.secondary,
+                            strokeWidth: 1
+                          }}
                         >
                           {summaryData.map((entry, index) => (
                             <Cell
@@ -451,35 +531,48 @@ const Reports = () => {
               </Card>
             </Grid>
 
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <Card>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom color="primary.dark" fontWeight={600}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 3 } }}>
+                  <Typography 
+                    variant={isMobile ? "subtitle1" : "h6"} 
+                    gutterBottom 
+                    color="primary.dark" 
+                    fontWeight={600}
+                  >
                     Category Comparison
                   </Typography>
-                  <Box sx={{ height: isMobile ? 300 : 400, mt: 2 }}>
+                  <Box sx={{ height: isMobile ? 300 : 500, mt: 2 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={summaryData}
-                        margin={isMobile ? { top: 5, right: 10, left: -20, bottom: 60 } : { top: 5, right: 30, left: 20, bottom: 60 }}
+                        margin={isMobile ? 
+                          { top: 20, right: 10, left: 0, bottom: 20 } : 
+                          { top: 20, right: 30, left: 20, bottom: 20 }}
+                        layout="vertical"
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                         <XAxis
-                          dataKey="category"
+                          type="number"
                           stroke={theme.palette.text.secondary}
-                          tick={{ fill: theme.palette.text.secondary }}
-                          angle={-45}
-                          textAnchor="end"
-                          height={100}
-                          interval={0}
-                          fontSize={isMobile ? 10 : 12}
+                          tick={{ 
+                            fill: theme.palette.text.secondary,
+                            fontSize: isMobile ? 10 : 12 
+                          }}
+                          tickFormatter={(value) => `₹${value.toLocaleString()}`}
                         />
                         <YAxis
+                          type="category"
+                          dataKey="category"
                           stroke={theme.palette.text.secondary}
-                          tick={{ fill: theme.palette.text.secondary }}
+                          tick={{ 
+                            fill: theme.palette.text.secondary,
+                            fontSize: isMobile ? 10 : 12
+                          }}
+                          width={isMobile ? 70 : 100}
                         />
                         <Tooltip content={<CustomTooltip />} />
-                        <Bar dataKey="total" radius={[8, 8, 0, 0]}>
+                        <Bar dataKey="total" radius={[0, 8, 8, 0]}>
                           {summaryData.map((entry, index) => (
                             <Cell
                               key={entry.category}
