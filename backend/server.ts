@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import { config } from 'dotenv';
@@ -34,26 +34,26 @@ const connectDB = async (retryCount = 0) => {
   
   if (!MONGODB_URI) {
     console.error('MONGODB_URI environment variable is not set');
-    process.exit(1);
+    return;
   }
 
   try {
-    const options = {
+    if (mongoose.connection.readyState === 1) {
+      console.log('MongoDB is already connected');
+      return;
+    }
+
+    const options: mongoose.ConnectOptions = {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
       connectTimeoutMS: 10000,
-      retryWrites: true,
-      retryReads: true,
       maxPoolSize: 10,
-      minPoolSize: 5,
-      keepAlive: true,
-      keepAliveInitialDelay: 300000
+      minPoolSize: 5
     };
 
     await mongoose.connect(MONGODB_URI, options);
     console.log('Connected to MongoDB successfully');
     
-    // Reset retry count on successful connection
     if (retryCount > 0) {
       console.log(`Successfully reconnected after ${retryCount} retries`);
     }
@@ -61,13 +61,11 @@ const connectDB = async (retryCount = 0) => {
     console.error(`MongoDB connection error (attempt ${retryCount + 1}/${MAX_RETRIES}):`, err);
     
     if (retryCount < MAX_RETRIES) {
-      // Exponential backoff: wait longer between each retry
       const waitTime = Math.min(1000 * Math.pow(2, retryCount), 10000);
       console.log(`Retrying connection in ${waitTime}ms...`);
       setTimeout(() => connectDB(retryCount + 1), waitTime);
     } else {
       console.error('Max retry attempts reached. Could not connect to MongoDB');
-      process.exit(1);
     }
   }
 };
@@ -87,34 +85,41 @@ mongoose.connection.on('error', (err) => {
 });
 
 // Health check route with enhanced database status
-app.get('/health', (_req, res) => {
-  const dbState = mongoose.connection.readyState;
-  const dbStates = {
-    0: 'disconnected',
-    1: 'connected',
-    2: 'connecting',
-    3: 'disconnecting'
-  };
-  
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    database: {
-      status: dbStates[dbState as keyof typeof dbStates],
-      host: mongoose.connection.host,
-      name: mongoose.connection.name
-    },
-    version: '1.0.0',
-    allowedOrigins
-  });
+app.get('/health', (_req: Request, res: Response) => {
+  try {
+    const dbState = mongoose.connection.readyState;
+    const dbStates: { [key: number]: string } = {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting'
+    };
+    
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      database: {
+        status: dbStates[dbState] || 'unknown',
+        host: mongoose.connection.host || 'unknown',
+        name: mongoose.connection.name || 'unknown'
+      },
+      version: '1.0.0',
+      allowedOrigins
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({
+      status: 'error',
+      error: 'Failed to check system health'
+    });
+  }
 });
 
 // Expense routes with enhanced error handling
-app.post('/api/expenses', async (req, res) => {
+app.post('/api/expenses', async (req: Request, res: Response) => {
   try {
     // Check database connection first
     if (mongoose.connection.readyState !== 1) {
-      console.error('Database not connected when attempting to create expense');
       return res.status(503).json({ 
         error: 'Database connection unavailable',
         details: 'The server is currently unable to handle the request due to database connection issues'
@@ -130,7 +135,6 @@ app.post('/api/expenses', async (req, res) => {
         amount: amount === undefined
       };
       
-      console.error('Validation error - missing fields:', missingFields);
       return res.status(400).json({ 
         error: 'Missing required fields',
         details: Object.entries(missingFields)
@@ -150,7 +154,6 @@ app.post('/api/expenses', async (req, res) => {
     // Create and save the expense
     const expense = new Expense(req.body);
     const savedExpense = await expense.save();
-    console.log('Expense created successfully:', savedExpense);
     res.status(201).json(savedExpense);
   } catch (error: any) {
     console.error('Error creating expense:', {
@@ -159,7 +162,6 @@ app.post('/api/expenses', async (req, res) => {
       body: req.body
     });
     
-    // Handle mongoose validation errors
     if (error.name === 'ValidationError') {
       return res.status(400).json({ 
         error: 'Validation error', 
@@ -167,7 +169,6 @@ app.post('/api/expenses', async (req, res) => {
       });
     }
     
-    // Handle other types of errors
     res.status(500).json({ 
       error: 'Failed to create expense',
       details: 'An unexpected error occurred while processing your request'
@@ -176,9 +177,8 @@ app.post('/api/expenses', async (req, res) => {
 });
 
 // Bulk expense creation
-app.post('/api/expenses/bulk', async (req, res) => {
+app.post('/api/expenses/bulk', async (req: Request, res: Response) => {
   try {
-    // Check database connection
     if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({ 
         error: 'Database connection unavailable',
@@ -195,7 +195,6 @@ app.post('/api/expenses/bulk', async (req, res) => {
     }
 
     const createdExpenses = await Expense.insertMany(expenses);
-    console.log(`Successfully created ${createdExpenses.length} expenses`);
     res.status(201).json(createdExpenses);
   } catch (error: any) {
     console.error('Error creating bulk expenses:', error);
@@ -214,9 +213,8 @@ app.post('/api/expenses/bulk', async (req, res) => {
   }
 });
 
-app.get('/api/expenses', async (_req, res) => {
+app.get('/api/expenses', async (_req: Request, res: Response) => {
   try {
-    // Check database connection
     if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({ 
         error: 'Database connection unavailable',
@@ -236,9 +234,8 @@ app.get('/api/expenses', async (_req, res) => {
 });
 
 // Monthly aggregation for reports
-app.get('/api/expenses/monthly', async (_req, res) => {
+app.get('/api/expenses/monthly', async (_req: Request, res: Response) => {
   try {
-    // Check database connection
     if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({ 
         error: 'Database connection unavailable',
@@ -270,7 +267,7 @@ app.get('/api/expenses/monthly', async (_req, res) => {
 });
 
 // Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   console.error('Unhandled error:', {
     error: err.message,
     stack: err.stack,
@@ -285,9 +282,5 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Health check available at http://localhost:${PORT}/health`);
-  console.log('Allowed origins:', allowedOrigins);
-});
+// Export the Express API
+export default app;
