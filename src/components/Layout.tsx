@@ -193,6 +193,25 @@ const Layout = ({ children }: LayoutProps) => {
           >
             <MenuIcon />
           </IconButton>
+          {/* Mobile Logo */}
+          <Box
+            sx={{
+              display: { xs: 'block', sm: 'none' },
+              width: '40px',
+              height: '40px',
+              mr: 2,
+            }}
+          >
+            <img
+              src={logo}
+              alt="Dentalyst Logo"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+              }}
+            />
+          </Box>
           <Typography
             variant="h6"
             noWrap
