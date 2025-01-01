@@ -28,11 +28,13 @@ const categories = [
   'Assistant',
   'Housekeeping',
   'Water',
+  'Bio Medicals',
   'Maid',
   'Repairs',
   'Rent',
   'E-Bill',
   'Profit',
+  'Lab Materials'
 ];
 
 const months = [
