@@ -226,23 +226,94 @@ app.get('/api/expenses', async (_req: Request, res: Response) => {
   }
 });
 
-// Monthly aggregation for reports
-app.get('/api/expenses/monthly', async (_req: Request, res: Response) => {
+// Delete expense
+app.delete('/api/expenses/:id', async (req: Request, res: Response) => {
   try {
-    const monthlyExpenses = await Expense.aggregate([
-      {
-        $group: {
+    const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        error: 'Invalid expense ID',
+        details: 'The provided ID is not a valid MongoDB ObjectId'
+      });
+    }
+
+    const deletedExpense = await Expense.findByIdAndDelete(id);
+    
+    if (!deletedExpense) {
+      return res.status(404).json({
+        error: 'Expense not found',
+        details: 'No expense found with the provided ID'
+      });
+    }
+
+    res.json({ message: 'Expense deleted successfully', expense: deletedExpense });
+  } catch (error) {
+    console.error('Error deleting expense:', error);
+    res.status(500).json({
+      error: 'Failed to delete expense',
+      details: 'An unexpected error occurred while deleting the expense'
+    });
+  }
+});
+
+// Monthly aggregation for reports
+app.get('/api/expenses/monthly', async (req: Request, res: Response) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters',
+        details: 'Both startDate and endDate are required'
+      });
+    }
+    console.log("Here")
+    const expenses = await Expense.find({
+      date: {
+        $gte: new Date(startDate as string),
+        $lte: new Date(endDate as string)
+      }
+    }).sort({ date: 1 });
+
+    // Group expenses by category only
+    const groupedExpenses = expenses.reduce((acc: any[], expense) => {
+      const existingGroup = acc.find(group => group._id.category === expense.category);
+      
+      if (existingGroup) {
+        existingGroup.total += expense.amount;
+        existingGroup.entries.push({
+          _id: expense._id,
+          date: expense.date,
+          amount: expense.amount
+        });
+        // Sort entries by date (newest first)
+        existingGroup.entries.sort((a: any, b: any) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+      } else {
+        acc.push({
           _id: {
-            month: { $month: '$date' },
-            year: { $year: '$date' },
-            category: '$category'
+            category: expense.category
           },
-          total: { $sum: '$amount' }
-        }
-      },
-      { $sort: { '_id.year': -1, '_id.month': -1 } }
-    ]);
-    res.json(monthlyExpenses);
+          total: expense.amount,
+          entries: [{
+          _id: expense._id,
+          date: expense.date,
+          amount: expense.amount
+          }]
+        });
+      }
+      
+      return acc;
+    }, []);
+
+    // Sort groups by category name
+    const sortedExpenses = groupedExpenses.sort((a, b) => 
+      a._id.category.localeCompare(b._id.category)
+    );
+
+    res.json(sortedExpenses);
   } catch (error) {
     console.error('Error fetching monthly expenses:', error);
     res.status(500).json({ 
@@ -266,6 +337,12 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
     error: 'Internal server error',
     message: 'An unexpected error occurred while processing your request'
   });
+});
+
+// Start the server
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
 
 // Export the Express API

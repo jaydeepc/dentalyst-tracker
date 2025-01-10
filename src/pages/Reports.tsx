@@ -19,11 +19,20 @@ import {
   Paper,
   useMediaQuery,
   CircularProgress,
-  Button
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  IconButton,
+  Tooltip
 } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { API_BASE_URL } from '../config';
 
 interface ExpenseEntry {
+  _id: string;
   date: string;
   amount: number;
 }
@@ -44,6 +53,36 @@ interface ProfitData {
   profit: number;
   profitPercentage: number;
 }
+
+interface DeleteDialogProps {
+  open: boolean;
+  expense: ExpenseEntry | null;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+const DeleteDialog = ({ open, expense, onClose, onConfirm }: DeleteDialogProps) => (
+  <Dialog open={open} onClose={onClose}>
+    <DialogTitle>Confirm Delete</DialogTitle>
+    <DialogContent>
+      <DialogContentText>
+        Are you sure you want to delete this expense?
+        <br /><br />
+        Amount: ₹{expense?.amount.toLocaleString()}
+        <br />
+        Date: {expense ? new Date(expense.date).toLocaleDateString('en-IN', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        }) : ''}
+      </DialogContentText>
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose} color="primary">Cancel</Button>
+      <Button onClick={onConfirm} color="error" variant="contained">Delete</Button>
+    </DialogActions>
+  </Dialog>
+);
 
 const categories = [
   'Gross Income',
@@ -68,6 +107,8 @@ const Reports = () => {
   const [endDate, setEndDate] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showEntries, setShowEntries] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<ExpenseEntry | null>(null);
   const [profitData, setProfitData] = useState<ProfitData>({
     grossIncome: 0,
     totalExpenses: 0,
@@ -135,6 +176,40 @@ const Reports = () => {
     if (!startDate || !endDate) return;
     setShowEntries(true);
     fetchExpenses();
+  };
+
+  const handleDeleteClick = (expense: ExpenseEntry) => {
+    setSelectedExpense(expense);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedExpense) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/expenses/${selectedExpense._id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete expense');
+      }
+
+      // Refresh data
+      fetchExpenses();
+      setError(null);
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete expense');
+    } finally {
+      setDeleteDialogOpen(false);
+      setSelectedExpense(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setSelectedExpense(null);
   };
 
   const filteredExpenses = useMemo(() => {
@@ -369,6 +444,7 @@ const Reports = () => {
                             <TableCell sx={{ color: 'white', fontWeight: 600 }}>Category</TableCell>
                             <TableCell sx={{ color: 'white', fontWeight: 600 }}>Date</TableCell>
                             <TableCell align="right" sx={{ color: 'white', fontWeight: 600 }}>Amount</TableCell>
+                            <TableCell align="center" sx={{ color: 'white', fontWeight: 600 }}>Actions</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -396,6 +472,17 @@ const Reports = () => {
                                   <TableCell align="right">
                                     ₹{entry.amount.toLocaleString()}
                                   </TableCell>
+                                  <TableCell align="center">
+                                    <Tooltip title="Delete Entry">
+                                      <IconButton
+                                        onClick={() => handleDeleteClick(entry)}
+                                        color="error"
+                                        size="small"
+                                      >
+                                        <DeleteIcon />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </TableCell>
                                 </TableRow>
                               ))}
                               <TableRow sx={{ 
@@ -408,6 +495,7 @@ const Reports = () => {
                                 <TableCell align="right" sx={{ color: 'white', fontWeight: 600 }}>
                                   ₹{expense.total.toLocaleString()}
                                 </TableCell>
+                                <TableCell /> {/* Empty cell for actions column */}
                               </TableRow>
                             </React.Fragment>
                           ))}
@@ -420,6 +508,13 @@ const Reports = () => {
             </>
           )}
         </Stack>
+
+        <DeleteDialog
+          open={deleteDialogOpen}
+          expense={selectedExpense}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+        />
       </Box>
     </Fade>
   );
