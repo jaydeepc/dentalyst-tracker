@@ -240,6 +240,103 @@ const Reports = () => {
             </Typography>
           </Box>
 
+          <Grid container spacing={{ xs: 1.5, sm: 3 }}>
+            <Grid item xs={6} sm={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(45deg, #2196f3 30%, #64b5f6 90%)',
+                color: 'white',
+                height: '100%'
+              }}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                  <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
+                    Gross Income
+                  </Typography>
+                  <Typography variant={isMobile ? "h6" : "h4"}>
+                    ₹{profitData.grossIncome.toLocaleString()}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(45deg, #ff9800 30%, #ffb74d 90%)',
+                color: 'white',
+                height: '100%'
+              }}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                  <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
+                    Total Expenses
+                  </Typography>
+                  <Typography variant={isMobile ? "h6" : "h4"}>
+                    ₹{profitData.totalExpenses.toLocaleString()}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(45deg, #4caf50 30%, #81c784 90%)',
+                color: 'white',
+                height: '100%'
+              }}>
+                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                  <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
+                    Net Profit
+                  </Typography>
+                  <Typography variant={isMobile ? "h6" : "h4"}>
+                    ₹{profitData.profit.toLocaleString()}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={6} md={3}>
+              <Card sx={{ 
+                background: 'linear-gradient(45deg, #9c27b0 30%, #ba68c8 90%)',
+                color: 'white',
+                height: '100%',
+                position: 'relative'
+              }}>
+                <CardContent sx={{ 
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  p: { xs: 1.5, sm: 2 }
+                }}>
+                  <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                    <CircularProgress
+                      variant="determinate"
+                      value={Math.max(0, Math.min(profitData.profitPercentage, 100))}
+                      size={isMobile ? 40 : 80}
+                      thickness={4}
+                      sx={{ color: 'rgba(255, 255, 255, 0.9)' }}
+                    />
+                    <Box
+                      sx={{
+                        top: 0,
+                        left: 0,
+                        bottom: 0,
+                        right: 0,
+                        position: 'absolute',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Typography variant={isMobile ? "caption" : "h6"} component="div" color="white">
+                        {Math.round(profitData.profitPercentage)}%
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Typography variant={isMobile ? "body2" : "subtitle1"} sx={{ mt: 1 }}>
+                    Profit Margin
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
           <Card>
             <CardContent sx={{ p: { xs: 1.5, sm: 3 } }}>
               <Grid container spacing={{ xs: 1.5, sm: 3 }} alignItems="center">
@@ -309,103 +406,6 @@ const Reports = () => {
 
           {showEntries && (
             <>
-              <Grid container spacing={{ xs: 1.5, sm: 3 }}>
-                <Grid item xs={6} sm={6} md={3}>
-                  <Card sx={{ 
-                    background: 'linear-gradient(45deg, #2196f3 30%, #64b5f6 90%)',
-                    color: 'white',
-                    height: '100%'
-                  }}>
-                    <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
-                      <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
-                        Gross Income
-                      </Typography>
-                      <Typography variant={isMobile ? "h6" : "h4"}>
-                        ₹{profitData.grossIncome.toLocaleString()}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={6} sm={6} md={3}>
-                  <Card sx={{ 
-                    background: 'linear-gradient(45deg, #ff9800 30%, #ffb74d 90%)',
-                    color: 'white',
-                    height: '100%'
-                  }}>
-                    <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
-                      <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
-                        Total Expenses
-                      </Typography>
-                      <Typography variant={isMobile ? "h6" : "h4"}>
-                        ₹{profitData.totalExpenses.toLocaleString()}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={6} sm={6} md={3}>
-                  <Card sx={{ 
-                    background: 'linear-gradient(45deg, #4caf50 30%, #81c784 90%)',
-                    color: 'white',
-                    height: '100%'
-                  }}>
-                    <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
-                      <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
-                        Net Profit
-                      </Typography>
-                      <Typography variant={isMobile ? "h6" : "h4"}>
-                        ₹{profitData.profit.toLocaleString()}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={6} sm={6} md={3}>
-                  <Card sx={{ 
-                    background: 'linear-gradient(45deg, #9c27b0 30%, #ba68c8 90%)',
-                    color: 'white',
-                    height: '100%',
-                    position: 'relative'
-                  }}>
-                    <CardContent sx={{ 
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      height: '100%',
-                      p: { xs: 1.5, sm: 2 }
-                    }}>
-                      <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                        <CircularProgress
-                          variant="determinate"
-                          value={Math.max(0, Math.min(profitData.profitPercentage, 100))}
-                          size={isMobile ? 40 : 80}
-                          thickness={4}
-                          sx={{ color: 'rgba(255, 255, 255, 0.9)' }}
-                        />
-                        <Box
-                          sx={{
-                            top: 0,
-                            left: 0,
-                            bottom: 0,
-                            right: 0,
-                            position: 'absolute',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <Typography variant={isMobile ? "caption" : "h6"} component="div" color="white">
-                            {Math.round(profitData.profitPercentage)}%
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <Typography variant={isMobile ? "body2" : "subtitle1"} sx={{ mt: 1 }}>
-                        Profit Margin
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
-
               {/* Loading and Error States */}
               {isLoading && (
                 <Card>
