@@ -103,8 +103,11 @@ const Reports = () => {
   const [expenses, setExpenses] = useState<ExpenseData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<'date' | 'month' | 'year'>('date');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [selectedYear, setSelectedYear] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showEntries, setShowEntries] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -144,16 +147,44 @@ const Reports = () => {
     });
   };
 
-  const fetchExpenses = async (withDateFilter = false) => {
+  const fetchExpenses = async (withFilter = false) => {
     setIsLoading(true);
     setError(null);
     try {
       const url = new URL(`${API_BASE_URL}/api/expenses/monthly`);
       
-      if (withDateFilter && startDate && endDate) {
-        // Add time to get full day ranges (start of day to end of day)
-        url.searchParams.append('startDate', `${startDate}T00:00:00`);
-        url.searchParams.append('endDate', `${endDate}T23:59:59`);
+      if (withFilter) {
+        let start: Date, end: Date;
+        
+        switch (filterType) {
+          case 'date':
+            if (startDate && endDate) {
+              start = new Date(`${startDate}T00:00:00`);
+              end = new Date(`${endDate}T23:59:59`);
+            } else return;
+            break;
+          
+          case 'month':
+            if (selectedMonth) {
+              const [year, month] = selectedMonth.split('-');
+              start = new Date(parseInt(year), parseInt(month) - 1, 1);
+              end = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+            } else return;
+            break;
+          
+          case 'year':
+            if (selectedYear) {
+              start = new Date(parseInt(selectedYear), 0, 1);
+              end = new Date(parseInt(selectedYear), 11, 31, 23, 59, 59);
+            } else return;
+            break;
+          
+          default:
+            return;
+        }
+        
+        url.searchParams.append('startDate', start.toISOString());
+        url.searchParams.append('endDate', end.toISOString());
       } else {
         // Get all expenses till date
         const today = new Date();
@@ -185,9 +216,23 @@ const Reports = () => {
   }, []);
 
   const handleViewEntries = () => {
-    if (!startDate || !endDate) return;
-    setShowEntries(true);
-    fetchExpenses(true);
+    let canProceed = false;
+    switch (filterType) {
+      case 'date':
+        canProceed = !!(startDate && endDate);
+        break;
+      case 'month':
+        canProceed = !!selectedMonth;
+        break;
+      case 'year':
+        canProceed = !!selectedYear;
+        break;
+    }
+    
+    if (canProceed) {
+      setShowEntries(true);
+      fetchExpenses(true);
+    }
   };
 
   const handleDeleteClick = (expense: ExpenseEntry) => {
@@ -354,36 +399,103 @@ const Reports = () => {
               <Grid container spacing={{ xs: 1.5, sm: 3 }} alignItems="center">
                 <Grid item xs={12} md={3}>
                   <TextField
+                    select
                     fullWidth
-                    type="date"
-                    label="Start Date"
-                    value={startDate}
+                    label="Filter Type"
+                    value={filterType}
                     onChange={(e) => {
-                      setStartDate(e.target.value);
+                      setFilterType(e.target.value as 'date' | 'month' | 'year');
                       setShowEntries(false);
-                    }}
-                    InputLabelProps={{
-                      shrink: true,
+                      // Reset all filter values
+                      setStartDate('');
+                      setEndDate('');
+                      setSelectedMonth('');
+                      setSelectedYear('');
                     }}
                     size={isMobile ? "small" : "medium"}
-                  />
+                  >
+                    <MenuItem value="date">Date Range</MenuItem>
+                    <MenuItem value="month">Month</MenuItem>
+                    <MenuItem value="year">Year</MenuItem>
+                  </TextField>
                 </Grid>
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    fullWidth
-                    type="date"
-                    label="End Date"
-                    value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value);
-                      setShowEntries(false);
-                    }}
-                    InputLabelProps={{
-                      shrink: true,
-                    }}
-                    size={isMobile ? "small" : "medium"}
-                  />
-                </Grid>
+
+                {filterType === 'date' && (
+                  <>
+                    <Grid item xs={12} md={2}>
+                      <TextField
+                        fullWidth
+                        type="date"
+                        label="Start Date"
+                        value={startDate}
+                        onChange={(e) => {
+                          setStartDate(e.target.value);
+                          setShowEntries(false);
+                        }}
+                        InputLabelProps={{
+                          shrink: true,
+                        }}
+                        size={isMobile ? "small" : "medium"}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={2}>
+                      <TextField
+                        fullWidth
+                        type="date"
+                        label="End Date"
+                        value={endDate}
+                        onChange={(e) => {
+                          setEndDate(e.target.value);
+                          setShowEntries(false);
+                        }}
+                        InputLabelProps={{
+                          shrink: true,
+                        }}
+                        size={isMobile ? "small" : "medium"}
+                      />
+                    </Grid>
+                  </>
+                )}
+
+                {filterType === 'month' && (
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      type="month"
+                      label="Select Month"
+                      value={selectedMonth}
+                      onChange={(e) => {
+                        setSelectedMonth(e.target.value);
+                        setShowEntries(false);
+                      }}
+                      InputLabelProps={{
+                        shrink: true,
+                      }}
+                      size={isMobile ? "small" : "medium"}
+                    />
+                  </Grid>
+                )}
+
+                {filterType === 'year' && (
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Select Year"
+                      value={selectedYear}
+                      onChange={(e) => {
+                        setSelectedYear(e.target.value);
+                        setShowEntries(false);
+                      }}
+                      inputProps={{
+                        min: 2000,
+                        max: new Date().getFullYear(),
+                      }}
+                      size={isMobile ? "small" : "medium"}
+                    />
+                  </Grid>
+                )}
+
                 <Grid item xs={12} md={3}>
                   <TextField
                     select
@@ -406,7 +518,11 @@ const Reports = () => {
                     fullWidth
                     variant="contained"
                     onClick={handleViewEntries}
-                    disabled={!startDate || !endDate}
+                    disabled={
+                      (filterType === 'date' && (!startDate || !endDate)) ||
+                      (filterType === 'month' && !selectedMonth) ||
+                      (filterType === 'year' && !selectedYear)
+                    }
                     sx={{ height: '100%', minHeight: 40 }}
                   >
                     View Entries
