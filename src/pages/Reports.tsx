@@ -144,16 +144,23 @@ const Reports = () => {
     });
   };
 
-  const fetchExpenses = async () => {
-    if (!startDate || !endDate) return;
-    
+  const fetchExpenses = async (withDateFilter = false) => {
     setIsLoading(true);
     setError(null);
     try {
       const url = new URL(`${API_BASE_URL}/api/expenses/monthly`);
-      // Add time to get full day ranges (start of day to end of day)
-      url.searchParams.append('startDate', `${startDate}T00:00:00`);
-      url.searchParams.append('endDate', `${endDate}T23:59:59`);
+      
+      if (withDateFilter && startDate && endDate) {
+        // Add time to get full day ranges (start of day to end of day)
+        url.searchParams.append('startDate', `${startDate}T00:00:00`);
+        url.searchParams.append('endDate', `${endDate}T23:59:59`);
+      } else {
+        // Get all expenses till date
+        const today = new Date();
+        const firstDay = new Date(2000, 0, 1); // Start from year 2000
+        url.searchParams.append('startDate', firstDay.toISOString());
+        url.searchParams.append('endDate', today.toISOString());
+      }
       
       const response = await fetch(url);
       if (!response.ok) {
@@ -172,10 +179,15 @@ const Reports = () => {
     }
   };
 
+  // Load all expenses on mount
+  React.useEffect(() => {
+    fetchExpenses();
+  }, []);
+
   const handleViewEntries = () => {
     if (!startDate || !endDate) return;
     setShowEntries(true);
-    fetchExpenses();
+    fetchExpenses(true);
   };
 
   const handleDeleteClick = (expense: ExpenseEntry) => {
@@ -195,8 +207,8 @@ const Reports = () => {
         throw new Error('Failed to delete expense');
       }
 
-      // Refresh data
-      fetchExpenses();
+      // Refresh data with current filter state
+      fetchExpenses(showEntries);
       setError(null);
     } catch (error) {
       console.error('Error deleting expense:', error);
