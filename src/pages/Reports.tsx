@@ -26,7 +26,8 @@ import {
   DialogContentText,
   DialogActions,
   IconButton,
-  Tooltip
+  Tooltip,
+  Checkbox
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { API_BASE_URL } from '../config';
@@ -56,25 +57,34 @@ interface ProfitData {
 
 interface DeleteDialogProps {
   open: boolean;
-  expense: ExpenseEntry | null;
+  expenses: ExpenseEntry[];
   onClose: () => void;
   onConfirm: () => void;
 }
 
-const DeleteDialog = ({ open, expense, onClose, onConfirm }: DeleteDialogProps) => (
+const DeleteDialog = ({ open, expenses, onClose, onConfirm }: DeleteDialogProps) => (
   <Dialog open={open} onClose={onClose}>
     <DialogTitle>Confirm Delete</DialogTitle>
     <DialogContent>
       <DialogContentText>
-        Are you sure you want to delete this expense?
-        <br /><br />
-        Amount: ₹{expense?.amount.toLocaleString()}
-        <br />
-        Date: {expense ? new Date(expense.date).toLocaleDateString('en-IN', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        }) : ''}
+        Are you sure you want to delete {expenses.length === 1 ? 'this expense' : `these ${expenses.length} expenses`}?
+        {expenses.length === 1 ? (
+          <>
+            <br /><br />
+            Amount: ₹{expenses[0]?.amount.toLocaleString()}
+            <br />
+            Date: {new Date(expenses[0].date).toLocaleDateString('en-IN', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            })}
+          </>
+        ) : (
+          <>
+            <br /><br />
+            Total Amount: ₹{expenses.reduce((sum, exp) => sum + exp.amount, 0).toLocaleString()}
+          </>
+        )}
       </DialogContentText>
     </DialogContent>
     <DialogActions>
@@ -111,7 +121,7 @@ const Reports = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showEntries, setShowEntries] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedExpense, setSelectedExpense] = useState<ExpenseEntry | null>(null);
+  const [selectedExpenses, setSelectedExpenses] = useState<ExpenseEntry[]>([]);
   const [profitData, setProfitData] = useState<ProfitData>({
     grossIncome: 0,
     totalExpenses: 0,
@@ -236,37 +246,70 @@ const Reports = () => {
   };
 
   const handleDeleteClick = (expense: ExpenseEntry) => {
-    setSelectedExpense(expense);
+    setSelectedExpenses([expense]);
     setDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!selectedExpense) return;
+    if (selectedExpenses.length === 0) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/expenses/${selectedExpense._id}`, {
-        method: 'DELETE',
-      });
+      let response;
+      if (selectedExpenses.length === 1) {
+        response = await fetch(`${API_BASE_URL}/api/expenses/${selectedExpenses[0]._id}`, {
+          method: 'DELETE',
+        });
+      } else {
+        response = await fetch(`${API_BASE_URL}/api/expenses`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ids: selectedExpenses.map(exp => exp._id)
+          }),
+        });
+      }
 
       if (!response.ok) {
-        throw new Error('Failed to delete expense');
+        throw new Error('Failed to delete expense(s)');
       }
 
       // Refresh data with current filter state
       fetchExpenses(showEntries);
       setError(null);
     } catch (error) {
-      console.error('Error deleting expense:', error);
-      setError(error instanceof Error ? error.message : 'Failed to delete expense');
+      console.error('Error deleting expense(s):', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete expense(s)');
     } finally {
       setDeleteDialogOpen(false);
-      setSelectedExpense(null);
+      setSelectedExpenses([]);
     }
+  };
+
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      const allEntries = filteredExpenses.flatMap(expense => expense.entries);
+      setSelectedExpenses(allEntries);
+    } else {
+      setSelectedExpenses([]);
+    }
+  };
+
+  const handleSelectOne = (expense: ExpenseEntry) => {
+    setSelectedExpenses(prev => {
+      const isSelected = prev.some(e => e._id === expense._id);
+      if (isSelected) {
+        return prev.filter(e => e._id !== expense._id);
+      } else {
+        return [...prev, expense];
+      }
+    });
   };
 
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
-    setSelectedExpense(null);
+    setSelectedExpenses([]);
   };
 
   const filteredExpenses = useMemo(() => {
@@ -556,19 +599,43 @@ const Reports = () => {
               {!isLoading && !error && (
                 <Card>
                   <CardContent sx={{ p: { xs: 1.5, sm: 3 } }}>
-                    <Typography 
-                      variant={isMobile ? "h6" : "h5"} 
-                      gutterBottom 
-                      color="primary.dark" 
-                      fontWeight={600}
-                      sx={{ mb: 3 }}
-                    >
-                      Detailed Entries
-                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                      <Typography 
+                        variant={isMobile ? "h6" : "h5"} 
+                        color="primary.dark" 
+                        fontWeight={600}
+                      >
+                        Detailed Entries
+                      </Typography>
+                      {selectedExpenses.length > 0 && (
+                        <Button
+                          variant="contained"
+                          color="error"
+                          onClick={() => setDeleteDialogOpen(true)}
+                          startIcon={<DeleteIcon />}
+                        >
+                          Delete Selected ({selectedExpenses.length})
+                        </Button>
+                      )}
+                    </Box>
                     <TableContainer component={Paper} elevation={2}>
                       <Table size={isMobile ? "small" : "medium"}>
                         <TableHead>
                           <TableRow sx={{ backgroundColor: theme.palette.primary.main }}>
+                            <TableCell padding="checkbox" sx={{ color: 'white' }}>
+                              <Checkbox
+                                sx={{ color: 'white' }}
+                                indeterminate={
+                                  selectedExpenses.length > 0 &&
+                                  selectedExpenses.length < filteredExpenses.flatMap(e => e.entries).length
+                                }
+                                checked={
+                                  filteredExpenses.flatMap(e => e.entries).length > 0 &&
+                                  selectedExpenses.length === filteredExpenses.flatMap(e => e.entries).length
+                                }
+                                onChange={handleSelectAll}
+                              />
+                            </TableCell>
                             <TableCell sx={{ color: 'white', fontWeight: 600 }}>Category</TableCell>
                             <TableCell sx={{ color: 'white', fontWeight: 600 }}>Date</TableCell>
                             <TableCell align="right" sx={{ color: 'white', fontWeight: 600 }}>Amount</TableCell>
@@ -587,6 +654,12 @@ const Reports = () => {
                                     }
                                   }}
                                 >
+                                  <TableCell padding="checkbox">
+                                    <Checkbox
+                                      checked={selectedExpenses.some(e => e._id === entry._id)}
+                                      onChange={() => handleSelectOne(entry)}
+                                    />
+                                  </TableCell>
                                   <TableCell sx={{ fontWeight: 500 }}>
                                     {expense._id.category}
                                   </TableCell>
@@ -617,6 +690,7 @@ const Reports = () => {
                                 backgroundColor: theme.palette.primary.light,
                                 '&:last-child td': { borderBottom: 0 }
                               }}>
+                                <TableCell />
                                 <TableCell colSpan={2} sx={{ color: 'white', fontWeight: 600 }}>
                                   {expense._id.category} Total
                                 </TableCell>
@@ -639,7 +713,7 @@ const Reports = () => {
 
         <DeleteDialog
           open={deleteDialogOpen}
-          expense={selectedExpense}
+          expenses={selectedExpenses}
           onClose={handleDeleteCancel}
           onConfirm={handleDeleteConfirm}
         />

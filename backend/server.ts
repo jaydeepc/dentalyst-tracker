@@ -226,7 +226,7 @@ app.get('/api/expenses', async (_req: Request, res: Response) => {
   }
 });
 
-// Delete expense
+// Delete single expense
 app.delete('/api/expenses/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -253,6 +253,48 @@ app.delete('/api/expenses/:id', async (req: Request, res: Response) => {
     res.status(500).json({
       error: 'Failed to delete expense',
       details: 'An unexpected error occurred while deleting the expense'
+    });
+  }
+});
+
+// Bulk delete expenses
+app.delete('/api/expenses', async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        details: 'Expense IDs must be provided as a non-empty array'
+      });
+    }
+
+    // Validate all IDs
+    if (!ids.every(id => mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({
+        error: 'Invalid expense ID',
+        details: 'One or more IDs are not valid MongoDB ObjectIds'
+      });
+    }
+
+    const result = await Expense.deleteMany({ _id: { $in: ids } });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        error: 'No expenses found',
+        details: 'No expenses were found with the provided IDs'
+      });
+    }
+
+    res.json({ 
+      message: 'Expenses deleted successfully', 
+      count: result.deletedCount 
+    });
+  } catch (error) {
+    console.error('Error deleting expenses:', error);
+    res.status(500).json({
+      error: 'Failed to delete expenses',
+      details: 'An unexpected error occurred while deleting expenses'
     });
   }
 });
