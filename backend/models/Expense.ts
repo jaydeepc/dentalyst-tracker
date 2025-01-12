@@ -19,7 +19,9 @@ const expenseSchema = new mongoose.Schema({
       'Repairs',
       'Rent',
       'E-Bill',
-      'Profit'
+      'Profit',
+      'Bio Medicals',
+      'Lab Materials'
     ]
   },
   amount: {
