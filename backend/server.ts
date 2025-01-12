@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import { config } from 'dotenv';
 import Expense from './models/Expense';
+import Consultant from './models/Consultant';
 
 config();
 
@@ -125,8 +126,8 @@ app.get('/health', async (_req: Request, res: Response) => {
   }
 });
 
-// Apply database connection middleware to all expense routes
-app.use('/api/expenses', ensureDbConnected);
+// Apply database connection middleware to all API routes
+app.use('/api', ensureDbConnected);
 
 // Expense routes with enhanced error handling
 app.post('/api/expenses', async (req: Request, res: Response) => {
@@ -310,7 +311,7 @@ app.get('/api/expenses/monthly', async (req: Request, res: Response) => {
         details: 'Both startDate and endDate are required'
       });
     }
-    console.log("Here")
+
     const expenses = await Expense.find({
       date: {
         $gte: new Date(startDate as string),
@@ -327,7 +328,8 @@ app.get('/api/expenses/monthly', async (req: Request, res: Response) => {
         existingGroup.entries.push({
           _id: expense._id,
           date: expense.date,
-          amount: expense.amount
+          amount: expense.amount,
+          consultantName: expense.category === 'Consultants' ? expense.consultantName : undefined
         });
         // Sort entries by date (newest first)
         existingGroup.entries.sort((a: any, b: any) => 
@@ -340,9 +342,10 @@ app.get('/api/expenses/monthly', async (req: Request, res: Response) => {
           },
           total: expense.amount,
           entries: [{
-          _id: expense._id,
-          date: expense.date,
-          amount: expense.amount
+            _id: expense._id,
+            date: expense.date,
+            amount: expense.amount,
+            consultantName: expense.category === 'Consultants' ? expense.consultantName : undefined
           }]
         });
       }
@@ -361,6 +364,163 @@ app.get('/api/expenses/monthly', async (req: Request, res: Response) => {
     res.status(500).json({ 
       error: 'Failed to fetch monthly expenses',
       details: 'An unexpected error occurred while aggregating expenses'
+    });
+  }
+});
+
+// Consultant routes
+app.get('/api/consultants', async (_req: Request, res: Response) => {
+  try {
+    const consultants = await Consultant.find().sort({ name: 1 });
+    res.json(consultants);
+  } catch (error) {
+    console.error('Error fetching consultants:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch consultants',
+      details: 'An unexpected error occurred while retrieving consultants'
+    });
+  }
+});
+
+app.post('/api/consultants', async (req: Request, res: Response) => {
+  try {
+    const { name, specialization } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        details: ['Name is required']
+      });
+    }
+
+    const existingConsultant = await Consultant.findOne({ name });
+    if (existingConsultant) {
+      return res.status(400).json({
+        error: 'Duplicate consultant',
+        details: ['A consultant with this name already exists']
+      });
+    }
+
+    const consultant = new Consultant({ name, specialization });
+    const savedConsultant = await consultant.save();
+    res.status(201).json(savedConsultant);
+  } catch (error) {
+    console.error('Error creating consultant:', {
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+      body: req.body
+    });
+    res.status(500).json({ 
+      error: 'Failed to create consultant',
+      details: error instanceof Error ? error.message : 'An unexpected error occurred while creating the consultant'
+    });
+  }
+});
+
+app.put('/api/consultants/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, specialization, active } = req.body;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        error: 'Invalid consultant ID',
+        details: 'The provided ID is not a valid MongoDB ObjectId'
+      });
+    }
+
+    if (name) {
+      const existingConsultant = await Consultant.findOne({ 
+        name, 
+        _id: { $ne: id } 
+      });
+      if (existingConsultant) {
+        return res.status(400).json({
+          error: 'Duplicate consultant',
+          details: ['A consultant with this name already exists']
+        });
+      }
+    }
+
+    const consultant = await Consultant.findByIdAndUpdate(
+      id,
+      { name, specialization, active },
+      { new: true, runValidators: true }
+    );
+
+    if (!consultant) {
+      return res.status(404).json({
+        error: 'Consultant not found',
+        details: 'No consultant found with the provided ID'
+      });
+    }
+
+    res.json(consultant);
+  } catch (error) {
+    console.error('Error updating consultant:', error);
+    res.status(500).json({
+      error: 'Failed to update consultant',
+      details: 'An unexpected error occurred while updating the consultant'
+    });
+  }
+});
+
+app.delete('/api/consultants/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        error: 'Invalid consultant ID',
+        details: 'The provided ID is not a valid MongoDB ObjectId'
+      });
+    }
+
+    // Check if consultant has any expenses
+    const hasExpenses = await Expense.exists({ 
+      category: 'Consultants',
+      consultantName: (await Consultant.findById(id))?.name 
+    });
+
+    if (hasExpenses) {
+      // Instead of deleting, mark as inactive
+      const consultant = await Consultant.findByIdAndUpdate(
+        id,
+        { active: false },
+        { new: true }
+      );
+
+      if (!consultant) {
+        return res.status(404).json({
+          error: 'Consultant not found',
+          details: 'No consultant found with the provided ID'
+        });
+      }
+
+      return res.json({ 
+        message: 'Consultant marked as inactive',
+        consultant
+      });
+    }
+
+    const consultant = await Consultant.findByIdAndDelete(id);
+    
+    if (!consultant) {
+      return res.status(404).json({
+        error: 'Consultant not found',
+        details: 'No consultant found with the provided ID'
+      });
+    }
+
+    res.json({ 
+      message: 'Consultant deleted successfully',
+      consultant
+    });
+  } catch (error) {
+    console.error('Error deleting consultant:', error);
+    res.status(500).json({
+      error: 'Failed to delete consultant',
+      details: 'An unexpected error occurred while deleting the consultant'
     });
   }
 });

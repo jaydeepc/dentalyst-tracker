@@ -42,11 +42,19 @@ const months = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+interface Consultant {
+  _id: string;
+  name: string;
+  specialization: string;
+  active: boolean;
+}
+
 interface ExpenseFormData {
   date: string;
   category: string;
   amount: string;
   description: string;
+  consultantName?: string;
 }
 
 interface BulkExpenseFormData {
@@ -55,6 +63,7 @@ interface BulkExpenseFormData {
   category: string;
   totalAmount: string;
   description: string;
+  consultantName?: string;
 }
 
 interface SingleFormErrors {
@@ -62,6 +71,7 @@ interface SingleFormErrors {
   category?: string;
   amount?: string;
   description?: string;
+  consultantName?: string;
 }
 
 interface BulkFormErrors {
@@ -70,16 +80,19 @@ interface BulkFormErrors {
   category?: string;
   totalAmount?: string;
   description?: string;
+  consultantName?: string;
 }
 
 const ExpenseEntry = () => {
   const theme = useTheme();
   const [isBulkMode, setIsBulkMode] = useState(false);
+  const [consultants, setConsultants] = useState<Consultant[]>([]);
   const [formData, setFormData] = useState<ExpenseFormData>({
     date: new Date().toISOString().split('T')[0],
     category: '',
     amount: '',
     description: '',
+    consultantName: '',
   });
 
   const currentDate = new Date();
@@ -89,6 +102,7 @@ const ExpenseEntry = () => {
     category: '',
     totalAmount: '',
     description: '',
+    consultantName: '',
   });
 
   const [singleErrors, setSingleErrors] = useState<SingleFormErrors>({});
@@ -102,7 +116,29 @@ const ExpenseEntry = () => {
   // Generate year options (last 5 years to next year)
   const years = Array.from({ length: 7 }, (_, i) => currentDate.getFullYear() - 5 + i);
 
-  // Check backend health on component mount
+  // Fetch consultants on mount
+  useEffect(() => {
+    const fetchConsultants = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/consultants`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch consultants');
+        }
+        const data = await response.json();
+        setConsultants(data.filter((c: Consultant) => c.active));
+      } catch (error) {
+        setSnackbar({
+          open: true,
+          message: 'Failed to fetch consultants',
+          severity: 'error',
+        });
+      }
+    };
+
+    fetchConsultants();
+  }, []);
+
+  // Check backend health on mount
   useEffect(() => {
     const verifyBackend = async () => {
       const health = await checkBackendHealth();
@@ -129,6 +165,9 @@ const ExpenseEntry = () => {
     if (!formData.amount || isNaN(Number(formData.amount))) {
       newErrors.amount = 'Valid amount is required';
     }
+    if (formData.category === 'Consultants' && !formData.consultantName) {
+      newErrors.consultantName = 'Consultant name is required';
+    }
 
     setSingleErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -148,6 +187,9 @@ const ExpenseEntry = () => {
     }
     if (!bulkFormData.totalAmount || isNaN(Number(bulkFormData.totalAmount))) {
       newErrors.totalAmount = 'Valid total amount is required';
+    }
+    if (bulkFormData.category === 'Consultants' && !bulkFormData.consultantName) {
+      newErrors.consultantName = 'Consultant name is required';
     }
 
     setBulkErrors(newErrors);
@@ -177,6 +219,7 @@ const ExpenseEntry = () => {
           category: formData.category,
           amount: Number(formData.amount),
           description: formData.description,
+          consultantName: formData.category === 'Consultants' ? formData.consultantName : undefined,
         }),
       });
 
@@ -186,6 +229,7 @@ const ExpenseEntry = () => {
           category: '',
           amount: '',
           description: '',
+          consultantName: '',
         });
         setSnackbar({
           open: true,
@@ -193,12 +237,13 @@ const ExpenseEntry = () => {
           severity: 'success',
         });
       } else {
-        throw new Error('Failed to add expense');
+        const errorData = await response.json();
+        throw new Error(errorData.details?.[0] || 'Failed to add expense');
       }
     } catch (error) {
       setSnackbar({
         open: true,
-        message: 'Failed to add expense. Please try again.',
+        message: error instanceof Error ? error.message : 'Failed to add expense. Please try again.',
         severity: 'error',
       });
     }
@@ -232,6 +277,7 @@ const ExpenseEntry = () => {
           category: bulkFormData.category,
           amount: amountPerDay,
           description: bulkFormData.description,
+          consultantName: bulkFormData.category === 'Consultants' ? bulkFormData.consultantName : undefined,
         });
       }
 
@@ -249,6 +295,7 @@ const ExpenseEntry = () => {
           category: '',
           totalAmount: '',
           description: '',
+          consultantName: '',
         });
         setSnackbar({
           open: true,
@@ -256,12 +303,13 @@ const ExpenseEntry = () => {
           severity: 'success',
         });
       } else {
-        throw new Error('Failed to add bulk expenses');
+        const errorData = await response.json();
+        throw new Error(errorData.details?.[0] || 'Failed to add bulk expenses');
       }
     } catch (error) {
       setSnackbar({
         open: true,
-        message: 'Failed to add bulk expenses. Please try again.',
+        message: error instanceof Error ? error.message : 'Failed to add bulk expenses. Please try again.',
         severity: 'error',
       });
     }
@@ -403,6 +451,39 @@ const ExpenseEntry = () => {
                       ))}
                     </TextField>
                   </Grid>
+                  {formData.category === 'Consultants' && (
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        select
+                        fullWidth
+                        label="Consultant"
+                        value={formData.consultantName || ''}
+                        onChange={(e) =>
+                          setFormData({ ...formData, consultantName: e.target.value })
+                        }
+                        error={!!singleErrors.consultantName}
+                        helperText={singleErrors.consultantName}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            backgroundColor: 'background.paper',
+                            transition: 'all 0.2s ease-in-out',
+                            '&:hover': {
+                              backgroundColor: 'rgba(33, 150, 243, 0.02)',
+                            },
+                            '&.Mui-focused': {
+                              backgroundColor: 'rgba(33, 150, 243, 0.05)',
+                            },
+                          },
+                        }}
+                      >
+                        {consultants.map((consultant) => (
+                          <MenuItem key={consultant._id} value={consultant.name}>
+                            {consultant.name} {consultant.specialization ? `(${consultant.specialization})` : ''}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+                  )}
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
@@ -579,6 +660,39 @@ const ExpenseEntry = () => {
                       ))}
                     </TextField>
                   </Grid>
+                  {bulkFormData.category === 'Consultants' && (
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        select
+                        fullWidth
+                        label="Consultant"
+                        value={bulkFormData.consultantName || ''}
+                        onChange={(e) =>
+                          setBulkFormData({ ...bulkFormData, consultantName: e.target.value })
+                        }
+                        error={!!bulkErrors.consultantName}
+                        helperText={bulkErrors.consultantName}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            backgroundColor: 'background.paper',
+                            transition: 'all 0.2s ease-in-out',
+                            '&:hover': {
+                              backgroundColor: 'rgba(33, 150, 243, 0.02)',
+                            },
+                            '&.Mui-focused': {
+                              backgroundColor: 'rgba(33, 150, 243, 0.05)',
+                            },
+                          },
+                        }}
+                      >
+                        {consultants.map((consultant) => (
+                          <MenuItem key={consultant._id} value={consultant.name}>
+                            {consultant.name} {consultant.specialization ? `(${consultant.specialization})` : ''}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+                  )}
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth

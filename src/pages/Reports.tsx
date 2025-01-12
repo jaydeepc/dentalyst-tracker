@@ -36,6 +36,14 @@ interface ExpenseEntry {
   _id: string;
   date: string;
   amount: number;
+  consultantName?: string;
+}
+
+interface ConsultantDialogProps {
+  open: boolean;
+  consultantName: string;
+  payments: ExpenseEntry[];
+  onClose: () => void;
 }
 
 interface ExpenseData {
@@ -61,6 +69,49 @@ interface DeleteDialogProps {
   onClose: () => void;
   onConfirm: () => void;
 }
+
+const ConsultantDialog = ({ open, consultantName, payments, onClose }: ConsultantDialogProps) => (
+  <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <DialogTitle>
+      Payment History - {consultantName}
+    </DialogTitle>
+    <DialogContent>
+      <TableContainer component={Paper} sx={{ mt: 2 }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Date</TableCell>
+              <TableCell align="right">Amount</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {payments.map((payment) => (
+              <TableRow key={payment._id}>
+                <TableCell>
+                  {new Date(payment.date).toLocaleDateString('en-IN', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  })}
+                </TableCell>
+                <TableCell align="right">₹{payment.amount.toLocaleString()}</TableCell>
+              </TableRow>
+            ))}
+            <TableRow>
+              <TableCell sx={{ fontWeight: 'bold' }}>Total</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold' }}>
+                ₹{payments.reduce((sum, payment) => sum + payment.amount, 0).toLocaleString()}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose}>Close</Button>
+    </DialogActions>
+  </Dialog>
+);
 
 const DeleteDialog = ({ open, expenses, onClose, onConfirm }: DeleteDialogProps) => (
   <Dialog open={open} onClose={onClose}>
@@ -122,6 +173,11 @@ const Reports = () => {
   const [showEntries, setShowEntries] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedExpenses, setSelectedExpenses] = useState<ExpenseEntry[]>([]);
+  const [consultantDialogOpen, setConsultantDialogOpen] = useState(false);
+  const [selectedConsultant, setSelectedConsultant] = useState<{name: string, payments: ExpenseEntry[]}>({
+    name: '',
+    payments: []
+  });
   const [profitData, setProfitData] = useState<ProfitData>({
     grossIncome: 0,
     totalExpenses: 0,
@@ -661,7 +717,26 @@ const Reports = () => {
                                     />
                                   </TableCell>
                                   <TableCell sx={{ fontWeight: 500 }}>
-                                    {expense._id.category}
+                                    {expense._id.category === 'Consultants' && entry.consultantName ? (
+                                      <Button
+                                        onClick={() => {
+                                          setSelectedConsultant({
+                                            name: entry.consultantName!,
+                                            payments: filteredExpenses
+                                              .filter(e => e._id.category === 'Consultants')
+                                              .flatMap(e => e.entries)
+                                              .filter(e => e.consultantName === entry.consultantName)
+                                          });
+                                          setConsultantDialogOpen(true);
+                                        }}
+                                        color="primary"
+                                        sx={{ textTransform: 'none' }}
+                                      >
+                                        {expense._id.category} - {entry.consultantName}
+                                      </Button>
+                                    ) : (
+                                      expense._id.category
+                                    )}
                                   </TableCell>
                                   <TableCell>
                                     {new Date(entry.date).toLocaleDateString('en-IN', {
@@ -716,6 +791,13 @@ const Reports = () => {
           expenses={selectedExpenses}
           onClose={handleDeleteCancel}
           onConfirm={handleDeleteConfirm}
+        />
+        
+        <ConsultantDialog
+          open={consultantDialogOpen}
+          consultantName={selectedConsultant.name}
+          payments={selectedConsultant.payments}
+          onClose={() => setConsultantDialogOpen(false)}
         />
       </Box>
     </Fade>

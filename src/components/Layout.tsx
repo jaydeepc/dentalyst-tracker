@@ -21,6 +21,7 @@ import {
   Menu as MenuIcon,
   AddCircle as AddIcon,
   Assessment as ReportIcon,
+  People as PeopleIcon,
 } from '@mui/icons-material';
 import logo from '../assets/logo.png';
 
@@ -44,6 +45,7 @@ const Layout = ({ children }: LayoutProps) => {
   const menuItems = [
     { text: 'New Expense', icon: <AddIcon />, path: '/expense-entry' },
     { text: 'Reports', icon: <ReportIcon />, path: '/reports' },
+    { text: 'Consultants', icon: <PeopleIcon />, path: '/consultants' },
   ];
 
   const drawer = (

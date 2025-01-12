@@ -3,6 +3,7 @@ import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import Layout from './components/Layout';
 import ExpenseEntry from './pages/ExpenseEntry';
 import Reports from './pages/Reports';
+import ConsultantManagement from './pages/ConsultantManagement';
 
 const theme = createTheme({
   palette: {
@@ -352,6 +353,7 @@ function App() {
             <Route path="/" element={<Navigate to="/expense-entry" replace />} />
             <Route path="/expense-entry" element={<ExpenseEntry />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/consultants" element={<ConsultantManagement />} />
           </Routes>
         </Layout>
       </BrowserRouter>

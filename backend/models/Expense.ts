@@ -31,6 +31,12 @@ const expenseSchema = new mongoose.Schema({
   description: {
     type: String,
     required: false
+  },
+  consultantName: {
+    type: String,
+    required: function(this: { category: string }) {
+      return this.category === 'Consultants';
+    }
   }
 }, {
   timestamps: true
